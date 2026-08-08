@@ -21,7 +21,9 @@ In Quantum Mechanics, standard models face highly irregular loss landscapes due 
 
 ### 1. Quaternion $S^3$ Mapping (Geometric Smoothing)
 By mapping the physical coordinates into a smooth $S^3$ manifold using a Quaternion representation:
-$$ \mathbf{q} = \cos\left(\frac{\theta}{2}\right) + \mathbf{u} \sin\left(\frac{\theta}{2}\right) $$
+
+$\mathbf{q} = \cos\left(\frac{\theta}{2}\right) + \mathbf{u} \sin\left(\frac{\theta}{2}\right)$
+
 the framework naturally eliminates coordinate singularities at particle coincidence, resulting in an intrinsically well-conditioned optimization terrain.
 
 ### 2. Analytic Integration of Kato's Cusp Conditions
