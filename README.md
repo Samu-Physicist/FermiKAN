@@ -1,7 +1,7 @@
 # FermiKAN: Physics-Designed Kolmogorov-Arnold Networks for Neural QMC
 
 ![Work in Progress](https://img.shields.io/badge/Status-Work_in_Progress-orange)
-*(DOI badge will be added here upon initial Zenodo release)*
+[![DOI](https://zenodo.org/badge/1327641826.svg)](https://doi.org/10.5281/zenodo.21849868)
 
 ## Overview
 This repository introduces **PD-KAN (Physics-Designed Kolmogorov-Arnold Networks)**, a universal meta-architecture for physics-informed machine learning, alongside its first concrete implementation: **FermiKAN** for Neural Quantum Monte Carlo (Neural QMC).
@@ -49,9 +49,8 @@ I am a theoretical physics student and have pushed the math as far as I can. **I
 ---
 
 ## Citation
-If you use the PD-KAN framework or this codebase in your research, please cite our forthcoming Zenodo release to acknowledge the academic priority of this architecture.
+If you use the PD-KAN framework or this codebase in your research, please cite our Zenodo release to acknowledge the academic priority of this architecture.
 
-*(Citation format placeholder - Will be updated with Zenodo DOI shortly)*
 ```bibtex
 @software{takamatsu_2026_fermikan,
   author       = {Takamatsu, Tomoaki},
@@ -60,7 +59,7 @@ If you use the PD-KAN framework or this codebase in your research, please cite o
   year         = 2026,
   publisher    = {Zenodo},
   version      = {v0.1.0-alpha},
-  doi          = {10.5281/zenodo.xxxxxxx},
-  url          = {https://doi.org/10.5281/zenodo.xxxxxxx}
+  doi          = {10.5281/zenodo.21849868},
+  url          = {https://doi.org/10.5281/zenodo.21849868}
 }
 ```
