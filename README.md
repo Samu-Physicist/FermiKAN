@@ -31,6 +31,12 @@ We explicitly embed Kato's cusp conditions into the KAN edges. By analytically a
 
 ---
 
+## The Future Vision: A Neuro-Symbolic Engine for Science
+
+Beyond optimization stability, PD-KAN introduces a crucial advantage for the era of AI Scientists: **Interpretability**. Because the KAN parameters converge into an "interpretable physical basis", this architecture can serve as a grounding module. By directly feeding these symbolic, physical parameters back to Large Language Models (LLMs), we can create a **Neuro-Symbolic feedback loop** that debugs agent hallucinations and enables the autonomous discovery of unknown physical phenomena.
+
+---
+
 ## The Engineering Challenge: Call for Collaborators 🚀
 
 While the mathematical foundation of PD-KAN successfully smooths the loss landscape, scaling this architecture to massive systems (e.g., Benzene) exposes a critical engineering bottleneck.
