@@ -19,12 +19,12 @@ While this framework is broadly applicable to any field governed by geometric si
 
 In Quantum Mechanics, standard models face highly irregular loss landscapes due to electron-electron and electron-nucleus singularities. **FermiKAN** applies the PD-KAN framework to eliminate these bottlenecks not by brute-force computation, but through geometry.
 
-### 1. Quaternion $S^3$ Mapping (Geometric Smoothing)
-By mapping the physical coordinates into a smooth $S^3$ manifold using a Quaternion representation:
+### 1. $\epsilon$-Manifold Embedding (Geometric Smoothing)
+By mapping the physical $\mathbb{R}^3$ coordinates into a bounded 4D manifold using an $\epsilon$-regularization mapping:
 
-$\mathbf{q} = \cos\left(\frac{\theta}{2}\right) + \mathbf{u} \sin\left(\frac{\theta}{2}\right)$
+$\mathbf{q} = \frac{1}{\sqrt{x^2 + y^2 + z^2 + \epsilon^2}}(x, y, z, \epsilon)$
 
-the framework naturally eliminates coordinate singularities at particle coincidence, resulting in an intrinsically well-conditioned optimization terrain.
+the framework naturally eliminates coordinate singularities (division-by-zero at the origin) and polynomial divergences (at infinity), providing an intrinsically well-conditioned, bounded terrain for evaluating angular representations ($\epsilon$-Regularized Solid Spherical Harmonics).
 
 ### 2. Analytic Integration of Kato's Cusp Conditions
 We explicitly embed Kato's cusp conditions into the KAN edges. By analytically absorbing the singular behavior at particle coincidence, the KAN is freed to focus solely on learning the smooth, residual many-body correlations—acting as a true, adaptive physical basis set.
