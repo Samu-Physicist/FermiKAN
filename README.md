@@ -13,6 +13,18 @@ Physical systems (from quantum mechanics to fluid dynamics) are often plagued by
 
 While this framework is broadly applicable to any field governed by geometric singularities, this repository presents its first proof-of-concept in the realm of quantum chemistry.
 
+### Acknowledgements / Prior Work
+This project is heavily inspired by and builds upon the foundational work of FermiNet by Google DeepMind (Pfau et al., 2020).
+While FermiNet beautifully demonstrated the power of deep learning in ab-initio quantum chemistry, PD-KAN introduces another approach by incorporating LCAO into the base functions of Kolmogorov-Arnold Networks (KANs). We deeply respect the original FermiNet team and the KAN authors (Ziming Liu et al., 2024) for their groundbreaking contributions and for paving the way in AI for Science.
+
+---
+
+## 🚀 Quick Start & Installation
+
+For a detailed walkthrough on setting up the JAX environment and running the experiments, please refer to our comprehensive guide:
+
+👉 **[Read the Full Installation & Usage Manual (manual.md)](manual.md)**
+
 ---
 
 ## The Academic Core: FermiKAN (QMC Implementation)
@@ -29,6 +41,13 @@ the framework naturally eliminates coordinate singularities (division-by-zero at
 ### 2. Analytic Integration of Kato's Cusp Conditions
 We explicitly embed Kato's cusp conditions into the KAN edges. By analytically absorbing the singular behavior at particle coincidence, the KAN is freed to focus solely on learning the smooth, residual many-body correlations—acting as a true, adaptive physical basis set.
 
+### 3. Parameter Compression & Speedup
+By utilizing physics-informed structural biases, FermiKAN achieves a staggering **~330x reduction in parameters** (1,328 vs 437,200) compared to the baseline FermiNet for the H2 molecule, while still converging to decent accuracy (-1.17 Hartree). This massive compression also translates to faster forward-pass execution (wall-time reduced from 687s to 115s).
+
+### 4. Glass-Box Interpretability & Exposing Spin Contamination
+The goal of PD-KAN is not just efficiency, but **XAI (Explainable AI) in Physics**. By stripping away the black-box MLPs and extracting the trained KAN weights, we attempted to translate the neural network's learned state back into mathematical formulas (LCAO molecular orbitals). 
+Through this, we caught the AI red-handed: to lower the Coulomb repulsion energy within a single-determinant constraint, the network autonomously performed **Unrestricted Hartree-Fock (UHF) symmetry breaking**, introducing physical "spin contamination" (fictitious magnetism) as a mathematical shortcut. This exposes the "Bitter Lesson" hidden inside Neural QMC architectures, proving that FermiKAN can act as a neuro-symbolic debugger.
+
 ---
 
 ## The Future Vision: A Neuro-Symbolic Engine for Science
@@ -37,15 +56,25 @@ Beyond optimization stability, PD-KAN introduces a crucial advantage for the era
 
 ---
 
-## The Engineering Challenge: Call for Collaborators 🚀
+## Known Issues & Next Steps ⚠️
 
-While the mathematical foundation of PD-KAN successfully smooths the loss landscape, scaling this architecture to massive systems (e.g., Benzene) exposes a critical engineering bottleneck.
+### 1. The Spin Contamination Cheat
+While the 330x compression and high accuracy are fantastic, our "Glass-box" interpretability revealed a physical flaw. To lower the Coulomb repulsion energy under a single-determinant constraint, the network autonomously performed **Unrestricted Hartree-Fock (UHF) style symmetry breaking**. This introduces physical "spin contamination" (fictitious magnetism) as a mathematical shortcut. 
+**Next Step:** We are currently developing an **RHF (Restricted Hartree-Fock) constrained version** of PD-KAN to force the AI to respect physical symmetries.
+
+### 2. The Engineering Challenge (K-FAC)
+While the mathematical foundation of PD-KAN successfully narrow the loss landscape, scaling this architecture to massive systems (e.g., Benzene) exposes a critical engineering bottleneck.
 
 Currently, for small-scale PoCs (like H2 dissociation), the geometrically smoothed landscape allows the model to converge rapidly using only **first-order optimization (Adam)**. 
 
-**However, the official K-FAC optimizer in the upstream FermiNet repository is currently broken under recent JAX/XLA updates.** To unlock the true potential of FermiKAN on massive, highly correlated systems, the revival of second-order optimization (K-FAC) is an absolute necessity. 
+**However, the official K-FAC optimizer in the upstream FermiNet repository is currently broken under recent JAX/XLA updates.** To unlock the potential of FermiKAN on massive, highly correlated systems, the revival of second-order optimization (K-FAC) is an absolute necessity. 
 
-I am a theoretical physics student and have pushed the math as far as I can. **I am actively looking for JAX/XLA wizards to help revive K-FAC for this architecture.** PRs are highly welcome!
+I am an R&D researcher at a chemical manufacturer and have pushed the math as far as I can. 
+**I am actively looking for:**
+1. **JAX/XLA wizards** to help revive K-FAC for this architecture.
+2. **Quantum Chemists & Physicists** to brainstorm and implement elegant physical constraints to cure the spin contamination cheat, as well as to identify and resolve any other unforeseen physical artifacts!
+
+PRs, forks, and discussions are highly welcome!
 
 ---
 
@@ -53,6 +82,13 @@ I am a theoretical physics student and have pushed the math as far as I can. **I
 - `ferminet/` : Modified JAX codebase integrating the PD-KAN architecture.
 - `articles/` : Drafts and explanatory articles regarding the architecture and methodology.
 - *Full implementation and PoC execution scripts will be uploaded in upcoming commits.*
+
+---
+
+## References
+1. Pfau, D., Spencer, J. S., Matthews, A. G. D. G., & Foulkes, W. M. C. (2020). Ab initio solution of the many-electron Schrödinger equation with deep neural networks. *Physical Review Research*, 2(3), 033429.
+2. Liu, Z., Wang, Y., Vaidya, S., Ruehle, F., Halverson, J., Soljačić, M., ... & Tegmark, M. (2024). KAN: Kolmogorov-Arnold Networks. *arXiv preprint arXiv:2404.19756*.
+3. Kato, T. (1957). On the eigenfunctions of many-particle systems in quantum mechanics. *Communications on Pure and Applied Mathematics*, 10(2), 151-177.
 
 ---
 
