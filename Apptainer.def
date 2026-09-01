@@ -1,0 +1,28 @@
+Bootstrap: docker
+From: mambaorg/micromamba:latest
+
+%files
+    environment.yml /opt/environment.yml
+    ferminet /opt/ferminet
+
+%post
+    # Install git (required for pip install git+https://...)
+    apt-get update && apt-get install -y git
+    
+    # Install dependencies into the base environment of the container
+    cd /opt
+    micromamba install -y -n base -f /opt/environment.yml
+    
+    # Patch kfac_jax to support latest JAX (replace deprecated jax.P)
+    sed -i 's/jax.P/jax.sharding.PartitionSpec/g' /opt/conda/lib/python3.10/site-packages/kfac_jax/_src/utils/parallel.py
+    
+    micromamba clean --all --yes
+
+%environment
+    # The base environment is automatically active in the mambaorg image,
+    # but we can explicitly add it just in case
+    export PATH="/opt/conda/bin:$PATH"
+
+%runscript
+    # Default execution passes arguments
+    exec "$@"
