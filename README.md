@@ -62,7 +62,11 @@ Beyond optimization stability, PD-KAN introduces a crucial advantage for the era
 While the 330x compression and high accuracy are fantastic, our "Glass-box" interpretability tool (`analyze_weights.py`) revealed something even more profoundly interesting. The network autonomously learned to mix $p_z$ components into the base $s$ orbitals to form a highly directional covalent bond, mimicking human-derived molecular orbital theory (hybridization). Furthermore, it managed to capture significant correlation energy (via the Jastrow factor) while largely preserving the spatial symmetry between the $\alpha$ and $\beta$ spin channels, avoiding severe UHF-style spin contamination.
 **Next Step:** We are developing automated post-processing pipelines to extract Natural Bond Orbitals (NBO) directly from the learned density matrices, allowing quantum chemists to directly interact with and interpret the AI's learned wavefunction.
 
-### 2. The Engineering Challenge (K-FAC)
+### 2. Initializing Larger Atoms (The Aufbau Challenge)
+Currently, the network initializes all electrons exclusively into the spherical $1s$ orbital state (with all $p$ and $d$ angular weights set exactly to zero) to prevent the initial energy from exploding. While this beautifully forces the AI to autonomously "invent" $p$ orbitals and discover the Pauli exclusion principle on the fly (a fascinating neuro-symbolic phenomenon), stuffing 6 or 8 electrons into a $1s$ orbital will cause catastrophic Pauli repulsion and gradient explosion for larger atoms like Carbon or Oxygen.
+**Next Step:** Implement a chemically-aware initialization strategy (guided by the Aufbau principle) that safely pre-allocates electrons into higher $s$ and $p$ shells for heavier elements. This will stabilize the initial optimization steps without losing the differentiable "Glass-Box" property.
+
+### 3. The Engineering Challenge (K-FAC)
 While the mathematical foundation of PD-KAN successfully narrow the loss landscape, scaling this architecture to massive systems (e.g., Benzene) exposes a critical engineering bottleneck.
 
 Currently, for small-scale PoCs (like H2 dissociation), the geometrically smoothed landscape allows the model to converge rapidly using only **first-order optimization (Adam)**. 
