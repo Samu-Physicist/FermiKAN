@@ -44,9 +44,9 @@ We explicitly embed Kato's cusp conditions into the KAN edges. By analytically a
 ### 3. Parameter Compression & Speedup
 By utilizing physics-informed structural biases, FermiKAN achieves a staggering **~330x reduction in parameters** (1,328 vs 437,200) compared to the baseline FermiNet for the H2 molecule, while still converging to decent accuracy (-1.17 Hartree). This massive compression also translates to faster forward-pass execution (wall-time reduced from 687s to 115s).
 
-### 4. Glass-Box Interpretability & Exposing Spin Contamination
-The goal of PD-KAN is not just efficiency, but **XAI (Explainable AI) in Physics**. By stripping away the black-box MLPs and extracting the trained KAN weights, we attempted to translate the neural network's learned state back into mathematical formulas (LCAO molecular orbitals). 
-Through this, we caught the AI red-handed: to lower the Coulomb repulsion energy within a single-determinant constraint, the network autonomously performed **Unrestricted Hartree-Fock (UHF) symmetry breaking**, introducing physical "spin contamination" (fictitious magnetism) as a mathematical shortcut. This exposes the "Bitter Lesson" hidden inside Neural QMC architectures, proving that FermiKAN can act as a neuro-symbolic debugger.
+### 4. Glass-Box Interpretability & Autonomous Hybridization
+The goal of PD-KAN is not just efficiency, but **XAI (Explainable AI) in Physics**. By stripping away the black-box MLPs and extracting the trained KAN weights, we successfully translated the neural network's learned state back into mathematical formulas (LCAO molecular orbitals) and extracted the corresponding 1-particle Reduced Density Matrix (1-RDM). 
+Through this, we discovered a stunning result: initialized with purely spherical $1s$ orbitals, the network autonomously discovered **chemical hybridization** (mixing in $p_z$ polarization functions) to stretch the electron cloud along the internuclear axis and form a textbook covalent $\sigma$ bond. By comparing the $\alpha$ and $\beta$ spin channels, we observed that FermiKAN achieved this without resorting to **severe** Unrestricted Hartree-Fock (UHF) style symmetry breaking (spin contamination). This indicates that FermiKAN can act as an interpretable neuro-symbolic engine for scientific discovery.
 
 ---
 
@@ -58,9 +58,9 @@ Beyond optimization stability, PD-KAN introduces a crucial advantage for the era
 
 ## Known Issues & Next Steps ⚠️
 
-### 1. The Spin Contamination Cheat
-While the 330x compression and high accuracy are fantastic, our "Glass-box" interpretability revealed a physical flaw. To lower the Coulomb repulsion energy under a single-determinant constraint, the network autonomously performed **Unrestricted Hartree-Fock (UHF) style symmetry breaking**. This introduces physical "spin contamination" (fictitious magnetism) as a mathematical shortcut. 
-**Next Step:** We are currently developing an **RHF (Restricted Hartree-Fock) constrained version** of PD-KAN to force the AI to respect physical symmetries.
+### 1. The Autonomous Hybridization Discovery
+While the 330x compression and high accuracy are fantastic, our "Glass-box" interpretability tool (`analyze_weights.py`) revealed something even more profoundly interesting. The network autonomously learned to mix $p_z$ components into the base $s$ orbitals to form a highly directional covalent bond, mimicking human-derived molecular orbital theory (hybridization). Furthermore, it managed to capture significant correlation energy (via the Jastrow factor) while largely preserving the spatial symmetry between the $\alpha$ and $\beta$ spin channels, avoiding severe UHF-style spin contamination.
+**Next Step:** We are developing automated post-processing pipelines to extract Natural Bond Orbitals (NBO) directly from the learned density matrices, allowing quantum chemists to directly interact with and interpret the AI's learned wavefunction.
 
 ### 2. The Engineering Challenge (K-FAC)
 While the mathematical foundation of PD-KAN successfully narrow the loss landscape, scaling this architecture to massive systems (e.g., Benzene) exposes a critical engineering bottleneck.
@@ -72,7 +72,7 @@ Currently, for small-scale PoCs (like H2 dissociation), the geometrically smooth
 I am an R&D researcher at a chemical manufacturer and have pushed the math as far as I can. 
 **I am actively looking for:**
 1. **JAX/XLA wizards** to help revive K-FAC for this architecture.
-2. **Quantum Chemists & Physicists** to brainstorm and implement elegant physical constraints to cure the spin contamination cheat, as well as to identify and resolve any other unforeseen physical artifacts!
+2. **Quantum Chemists & Physicists** to brainstorm and implement elegant physical constraints to identify and resolve any other unforeseen physical artifacts!
 
 PRs, forks, and discussions are highly welcome!
 
