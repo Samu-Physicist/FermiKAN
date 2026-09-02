@@ -134,8 +134,13 @@ def analyze():
     # Calculate separate density matrices for Alpha (MO 0) and Beta (MO 1)
     C_alpha = C_eff[:, 0:1]
     C_beta = C_eff[:, 1:2]
-    P_alpha = C_alpha @ C_alpha.T
-    P_beta = C_beta @ C_beta.T
+    
+    # Normalize the orbital vectors (L2 norm) because overall scaling cancels out in VMC
+    C_alpha_norm = C_alpha / np.linalg.norm(C_alpha)
+    C_beta_norm = C_beta / np.linalg.norm(C_beta)
+    
+    P_alpha = C_alpha_norm @ C_alpha_norm.T
+    P_beta = C_beta_norm @ C_beta_norm.T
     
     print(f"{'Basis Label':<25s} | {'Alpha (MO 0)':<12s} | {'Beta (MO 1)':<12s} | {'Diff':<8s}")
     print("-" * 65)
