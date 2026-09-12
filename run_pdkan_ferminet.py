@@ -32,7 +32,6 @@ def main(argv):
     import jax.numpy as jnp
     
     def pdkan_builder(nspins, charges, **kwargs):
-        sys.path.append('./archive')
         from ferminet_adapter import make_pdkan_network
         atoms = jnp.stack([jnp.array(atom.coords) for atom in config.system.molecule])
         charges_tuple = tuple([int(atom.charge) for atom in config.system.molecule])
