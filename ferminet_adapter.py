@@ -1,6 +1,6 @@
 import haiku as hk
 import jax.numpy as jnp
-from pdkan import FermiKAN_Network
+from pdkan_Dev import FermiKAN_Network
 
 def make_pdkan_network(atoms, spins, charges, **kwargs):
     """
@@ -27,7 +27,7 @@ def make_pdkan_network(atoms, spins, charges, **kwargs):
             num_electrons=N_e,
             num_determinants=kwargs.get("num_determinants", 1),
             n_up=n_up,
-            n_down=n_down
+            n_down=n_down,
         )
         
         # FermiNet might pass electrons flattened: (..., static_N_e * 3)

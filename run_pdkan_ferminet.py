@@ -57,7 +57,7 @@ def main(argv):
     config.optim.lr.rate = 1.0e-3  # LAMB allows slightly larger LR
     # config.optim.lr.decay = 0.5  # Mild decay to help settle at the bottom
     # config.optim.lr.delay = 700
-    config.optim.iterations = 100
+    config.optim.iterations = 10000
     config.mcmc.burn_in = 10
     config.batch_size = 16384
     
@@ -65,8 +65,8 @@ def main(argv):
     config.pretrain.iterations = 0
     
     # Save Checkpoints (frequency in minutes)
-    config.log.save_path = "archive"
-    config.log.save_frequency = 2.0
+    config.log.save_path = "test_V2"
+    config.log.save_frequency = 1.0
 
     
     import time

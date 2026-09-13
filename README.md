@@ -4,109 +4,56 @@
 [![DOI](https://zenodo.org/badge/1327641826.svg)](https://doi.org/10.5281/zenodo.21849868)
 
 ## Overview
-This repository introduces **PD-KAN (Physics-Designed Kolmogorov-Arnold Networks)**, a universal meta-architecture for physics-informed machine learning, alongside its first concrete implementation: **FermiKAN** for Neural Quantum Monte Carlo (Neural QMC).
+**FermiKAN** is a Neural Quantum Monte Carlo (Neural QMC) architecture that applies the **PD-KAN (Physics-Designed Kolmogorov-Arnold Networks)** framework. 
+By mapping physical basis sets (LCAO) into KANs, it achieves massive parameter compression (~330x smaller than the baseline FermiNet for H2) while enabling "Glass-Box" mechanistic interpretability of the learned quantum states.
 
-### The PD-KAN Universal Framework
-Physical systems (from quantum mechanics to fluid dynamics) are often plagued by mathematical singularities and boundary conditions that cause severe optimization instabilities in standard neural networks. **PD-KAN** solves this by establishing a universal, two-step architectural paradigm:
-1. **Geometric Manifold Mapping**: Analytically mapping the physical coordinates (and their inherent singularities/symmetries) into an intrinsically smooth geometric manifold.
-2. **Adaptive KAN Residuals**: Deploying Kolmogorov-Arnold Networks (KAN) on this smooth manifold to learn the true, underlying physical correlations (residuals) without fighting mathematical divergences.
-
-While this framework is broadly applicable to any field governed by geometric singularities, this repository presents its first proof-of-concept in the realm of quantum chemistry.
-
-### Acknowledgements / Prior Work
-This project is heavily inspired by and builds upon the foundational work of FermiNet by Google DeepMind (Pfau et al., 2020).
-While FermiNet beautifully demonstrated the power of deep learning in ab-initio quantum chemistry, PD-KAN introduces another approach by incorporating LCAO into the base functions of Kolmogorov-Arnold Networks (KANs). We deeply respect the original FermiNet team and the KAN authors (Ziming Liu et al., 2024) for their groundbreaking contributions and for paving the way in AI for Science.
-
----
+The framework establishes a universal, two-step architectural paradigm:
+1. **Geometric Manifold Mapping**: Analytically mapping the physical coordinates into an intrinsically smooth geometric manifold.
+2. **Adaptive KAN Residuals**: Deploying Kolmogorov-Arnold Networks (KAN) on this smooth manifold to learn the true, underlying physical correlations.
 
 ## 🚀 Quick Start & Installation
 
-For a detailed walkthrough on setting up the JAX environment and running the experiments, please refer to our comprehensive guide:
+For a detailed walkthrough on setting up the JAX environment (Apptainer/Conda) and running the experiments, please refer to our comprehensive guide:
 
 👉 **[Read the Full Installation & Usage Manual (manual.md)](manual.md)**
 
----
+### Basic Usage
+```bash
+# Activate the environment
+micromamba activate fermikan
 
-## The Academic Core: FermiKAN (QMC Implementation)
+# Run the H2 dissociation PoC
+python run_pdkan_ferminet.py
+```
 
-In Quantum Mechanics, standard models face highly irregular loss landscapes due to electron-electron and electron-nucleus singularities. **FermiKAN** applies the PD-KAN framework to eliminate these bottlenecks not by brute-force computation, but through geometry.
+## 📚 Documentation & Physics Reports
 
-### 1. $\epsilon$-Manifold Embedding (Geometric Smoothing)
-By mapping the physical $\mathbb{R}^3$ coordinates into a bounded 4D manifold using an $\epsilon$-regularization mapping:
+FermiKAN is designed not just for computational efficiency, but for **XAI (Explainable AI) in Physics**. 
+To read about our architectural design, optimization journeys, and the "Bitter Lesson" of Neural QMC symmetry breaking, please explore the following articles:
 
-$\mathbf{q} = \frac{1}{\sqrt{x^2 + y^2 + z^2 + \epsilon^2}}(x, y, z, \epsilon)$
+- [**The Optimization Journey & Physics Report**](articles/physics_report.md) - *Read how FermiKAN autonomously rediscovers Restricted Hartree-Fock (RHF) covalent bonds from isolated atoms.*
 
-the framework naturally eliminates coordinate singularities (division-by-zero at the origin) and polynomial divergences (at infinity), providing an intrinsically well-conditioned, bounded terrain for evaluating angular representations ($\epsilon$-Regularized Solid Spherical Harmonics).
-
-### 2. Analytic Integration of Kato's Cusp Conditions
-We explicitly embed Kato's cusp conditions into the KAN edges. By analytically absorbing the singular behavior at particle coincidence, the KAN is freed to focus solely on learning the smooth, residual many-body correlations—acting as a true, adaptive physical basis set.
-
-### 3. Parameter Compression & Speedup
-By separating the angular representation from a Chebyshev-distorted radial representation (FermiKAN V2), we achieve a staggering **~696x reduction in parameters** (628 vs 437,200) compared to the baseline FermiNet for the H2 molecule. 
-Remarkably, despite zero-shot initialization without PySCF pretraining, the model rapidly converged to an average energy of **-1.17435 Hartree** in 10,000 iterations (Adam optimizer), narrowing approaching chemical accuracy against the exact FCI limit (-1.17447 E_h). 
-**The Bitter Lesson & Alternative Hypotheses:** 
-While the representational power is definitively proven by this mean energy, the step-by-step energy variance is currently less stable than FermiNet. We hypothesize two potential causes for this:
-1. **Optimization Bottleneck**: We are currently restricted to first-order optimizers (Adam) rather than second-order methods (K-FAC). Adam struggles to perfectly settle at the extremely sharp, ill-conditioned minima of quantum wavefunctions without rattling.
-2. **Physical Model Rigidity (The Escape Route)**: It is also possible that the extreme compression to 628 parameters inherently restricts the high-frequency degrees of freedom needed to perfectly smooth out local energy fluctuations across the entire configuration space. Here, we must acknowledge the profound brilliance of DeepMind's original FermiNet: its deep, highly parameterized MLP architecture possesses an extraordinary and flexible representational capacity that flawlessly captures subtle quantum correlations. In contrast, our heavily compressed, rigid physical constraints might slightly miss these fine details or violate local cusp conditions dynamically. Further investigation into relaxing these constraints is required.
-
-### 4. Glass-Box Interpretability & The "Bitter Lesson" of Rigid Physics
-The goal of PD-KAN is not just efficiency, but **XAI (Explainable AI) in Physics**. By stripping away the black-box MLPs and extracting the trained KAN weights, we successfully translated the neural network's learned state back into mathematical formulas (LCAO molecular orbitals) and extracted the corresponding 1-particle Reduced Density Matrix (1-RDM). 
-Through this, we discovered a stunning result: initialized with purely spherical $1s$ orbitals, the network autonomously discovered **chemical hybridization** (mixing in $p_z$ polarization functions) to stretch the electron cloud along the internuclear axis, aiming to form a covalent $\sigma$ bond.
-
-**The Bitter Lesson:** We verified that extreme compression (~696x in V2) allows the network to approach the true FCI energy limit (-1.1743 Hartree). However, our "Glass-Box" analysis caught the AI cheating! By comparing the $\alpha$ and $\beta$ spin channels, we found that V2 resorted to severe **Unrestricted Hartree-Fock (UHF) style symmetry breaking (spin contamination)**. Because V2 mathematically enforces a strict separation between radial and angular variables, the orbital becomes completely rigid; its only way to avoid catastrophic Coulomb repulsion was to break spatial symmetry entirely. 
-In contrast, our V1 architecture (with a more moderate ~330x compression) possesses the expressivity to autonomously learn chemical hybridization while preserving the **Restricted Hartree-Fock (RHF) spin symmetry**, as demonstrated in our interpretability reports. However, we must acknowledge that this is not a mathematical guarantee; without explicit constraints, the optimizer is highly susceptible to falling into the more easily stabilized UHF local minimum to artificially avoid Coulomb repulsion.
-**Conclusion:** While pushing architectural compression over 700x achieves mathematically impressive energies, highly compressed models (both V1 and V2) are vulnerable to unphysical symmetry breaking due to the difficulty of optimization. To reliably force the neural network to respect RHF constraints without relying on lucky initialization trajectories, explicit physical constraints must be applied or further architectural innovation is required.
-
----
-
-## The Future Vision: A Neuro-Symbolic Engine for Science
-
-Beyond optimization stability, PD-KAN introduces a crucial advantage for the era of AI Scientists: **Interpretability**. Because the KAN parameters converge into an "interpretable physical basis", this architecture can serve as a grounding module. By directly feeding these symbolic, physical parameters back to Large Language Models (LLMs), we can create a **Neuro-Symbolic feedback loop** that debugs agent hallucinations and enables the autonomous discovery of unknown physical phenomena.
-
----
-
-## Known Issues & Next Steps ⚠️
-
-### 1. [RESOLVED] Initializing Larger Atoms (The Aufbau Challenge)
-Previously, the network initialized all electrons exclusively into the spherical $1s$ orbital state (with all $p$ and $d$ angular weights set exactly to zero) to prevent the initial energy from exploding. While this beautifully forced the AI to autonomously "invent" $p$ orbitals and discover the Pauli exclusion principle on the fly, stuffing 6 or 8 electrons into a $1s$ orbital caused catastrophic Pauli repulsion for larger atoms like Carbon or Oxygen.
-**Resolution:** We have successfully implemented a chemically-aware initialization strategy (`StochasticHomeAtomInitializer`) that safely pre-allocates electrons into their neutral atom ground-state shells (guided by atomic number $Z$). This stabilizes the initial optimization steps. *(Note: This creates a new optimization challenge: an "Activation Energy" plateau due to near-zero initial orbital overlap between isolated atoms, contributing to the ~10,000 iterations required for LiH convergence).*
-
-### 2. The Engineering Challenge (K-FAC)
-While the mathematical foundation of PD-KAN successfully narrow the loss landscape, scaling this architecture to massive systems (e.g., Benzene) exposes a critical engineering bottleneck.
-
-Currently, for small-scale PoCs (like H2 dissociation), the geometrically smoothed landscape allows the model to converge rapidly using only **first-order optimization (Adam)**. 
-
-**However, the official K-FAC optimizer in the upstream FermiNet repository is currently broken under recent JAX/XLA updates.** To unlock the potential of FermiKAN on massive, highly correlated systems, the revival of second-order optimization (K-FAC) is an absolute necessity. 
-
-I am an R&D researcher at a chemical manufacturer and have pushed the math as far as I can. 
-**I am actively looking for:**
-1. **JAX/XLA wizards** to help revive K-FAC for this architecture.
-2. **Quantum Chemists & Physicists** to brainstorm and implement elegant physical constraints to identify and resolve any other unforeseen physical artifacts!
-
-### 3. Expressivity vs. Optimization Dilemma (UHF Symmetry Breaking in LiH)
-While the PD-KAN architecture remarkably reaches near-FCI energy for LiH (e.g., -8.055 Hartree vs. -8.070 Hartree, requiring ~10,000 iterations), "Glass-Box" weight extraction reveals that it achieves this by abandoning textbook covalent bonding. Given the freedom of an Unrestricted Hartree-Fock (UHF) regime, the network breaks spatial symmetry (e.g., $\alpha$ localizing on H, $\beta$ localizing on Li d-orbitals) to artificially avoid Coulomb repulsion (Left-Right correlation). Since the exact physical ground state for closed-shell LiH possesses Restricted Hartree-Fock (RHF) symmetry, this behavior poses a fundamental physical question: Is the optimizer trapped in a high-dimensional UHF local minimum, or does the current highly-compressed, single-determinant ansatz simply lack the expressivity to capture dynamic correlation without breaking symmetry?
-**Next Step:** Apply strict RHF constraints (forcing $\alpha$ and $\beta$ to share spatial orbitals) on LiH. If the energy drops, it is an optimization failure. If the energy increases, it proves a mathematical ceiling of the current expressivity, necessitating the integration of multiple determinants or dynamic LCAO coefficients.
-
-PRs, forks, and discussions are highly welcome!
-
----
+## ⚠️ Known Issues
+- **K-FAC Optimizer**: The official K-FAC optimizer in the upstream FermiNet repository is currently broken under recent JAX/XLA updates. We currently rely on Adam (first-order), which requires ~10,000 iterations to cross symmetry-breaking energy plateaus. Revival of K-FAC is an absolute necessity for scaling to larger systems (e.g., Benzene). PRs and JAX/XLA wizards are highly welcome!
+- **Initialization Plateau**: The `StochasticHomeAtomInitializer` safely pre-allocates electrons into their neutral atom ground-state shells. This creates a safe but localized initial state, leading to an "Activation Energy" plateau due to near-zero initial orbital overlap between isolated atoms.
 
 ## Repository Structure
 - `ferminet/` : Modified JAX codebase integrating the PD-KAN architecture.
 - `articles/` : Drafts and explanatory articles regarding the architecture and methodology.
-- *Full implementation and PoC execution scripts will be uploaded in upcoming commits.*
+- `pdkan_Dev.py` / `run_pdkan_ferminet.py` : Core FermiKAN network definition and execution scripts.
 
 ---
+
+## Acknowledgements
+This project is heavily inspired by and builds upon the foundational work of FermiNet by Google DeepMind (Pfau et al., 2020) and the KAN authors (Ziming Liu et al., 2024).
 
 ## References
 1. Pfau, D., Spencer, J. S., Matthews, A. G. D. G., & Foulkes, W. M. C. (2020). Ab initio solution of the many-electron Schrödinger equation with deep neural networks. *Physical Review Research*, 2(3), 033429.
 2. Liu, Z., Wang, Y., Vaidya, S., Ruehle, F., Halverson, J., Soljačić, M., ... & Tegmark, M. (2024). KAN: Kolmogorov-Arnold Networks. *arXiv preprint arXiv:2404.19756*.
 3. Kato, T. (1957). On the eigenfunctions of many-particle systems in quantum mechanics. *Communications on Pure and Applied Mathematics*, 10(2), 151-177.
 
----
-
 ## Citation
-If you use the PD-KAN framework or this codebase in your research, please cite our Zenodo release to acknowledge the academic priority of this architecture.
+If you use the PD-KAN framework or this codebase in your research, please cite our Zenodo release:
 
 ```bibtex
 @software{takamatsu_2026_fermikan,
