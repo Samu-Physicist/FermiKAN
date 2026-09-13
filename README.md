@@ -7,6 +7,8 @@
 **FermiKAN** is a Neural Quantum Monte Carlo (Neural QMC) architecture that applies the **PD-KAN (Physics-Designed Kolmogorov-Arnold Networks)** framework. 
 By mapping physical basis sets (LCAO) into KANs, it achieves massive parameter compression (~330x smaller than the baseline FermiNet for H2) while enabling "Glass-Box" mechanistic interpretability of the learned quantum states.
 
+<img src="./articles/compression_chart.png" alt="Parameter Compression: 437k down to 1.3k" width="600" />
+
 The framework establishes a universal, two-step architectural paradigm:
 1. **Geometric Manifold Mapping**: Analytically mapping the physical coordinates into an intrinsically smooth geometric manifold.
 2. **Adaptive KAN Residuals**: Deploying Kolmogorov-Arnold Networks (KAN) on this smooth manifold to learn the true, underlying physical correlations.
