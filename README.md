@@ -33,6 +33,7 @@ python run_pdkan_ferminet.py
 FermiKAN is designed not just for computational efficiency, but for **XAI (Explainable AI) in Physics**. 
 To read about our architectural design, optimization journeys, and the "Bitter Lesson" of Neural QMC symmetry breaking, please explore the following articles:
 
+- [**The Architectural Whitepaper**](articles/whitepaper.md) - *A comprehensive guide to the theoretical foundations, geometric manifold embeddings, and how we achieved 330x parameter compression faced "The Bitter Lesson".*
 - [**The Optimization Journey & Physics Report**](articles/physics_report.md) - *Read how FermiKAN autonomously rediscovers Restricted Hartree-Fock (RHF) covalent bonds from isolated atoms.*
 
 ## ⚠️ Known Issues
