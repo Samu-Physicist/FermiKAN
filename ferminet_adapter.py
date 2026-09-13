@@ -1,6 +1,6 @@
 import haiku as hk
 import jax.numpy as jnp
-from pdkan_Dev import FermiKAN_Network
+from pdkan import FermiKAN_Network
 
 def make_pdkan_network(atoms, spins, charges, **kwargs):
     """
