@@ -49,9 +49,13 @@ While the representational power is definitively proven by this mean energy, the
 1. **Optimization Bottleneck**: We are currently restricted to first-order optimizers (Adam) rather than second-order methods (K-FAC). Adam struggles to perfectly settle at the extremely sharp, ill-conditioned minima of quantum wavefunctions without rattling.
 2. **Physical Model Rigidity (The Escape Route)**: It is also possible that the extreme compression to 628 parameters inherently restricts the high-frequency degrees of freedom needed to perfectly smooth out local energy fluctuations across the entire configuration space. Here, we must acknowledge the profound brilliance of DeepMind's original FermiNet: its deep, highly parameterized MLP architecture possesses an extraordinary and flexible representational capacity that flawlessly captures subtle quantum correlations. In contrast, our heavily compressed, rigid physical constraints might slightly miss these fine details or violate local cusp conditions dynamically. Further investigation into relaxing these constraints is required.
 
-### 4. Glass-Box Interpretability & Autonomous Hybridization
+### 4. Glass-Box Interpretability & The "Bitter Lesson" of Rigid Physics
 The goal of PD-KAN is not just efficiency, but **XAI (Explainable AI) in Physics**. By stripping away the black-box MLPs and extracting the trained KAN weights, we successfully translated the neural network's learned state back into mathematical formulas (LCAO molecular orbitals) and extracted the corresponding 1-particle Reduced Density Matrix (1-RDM). 
-Through this, we discovered a stunning result: initialized with purely spherical $1s$ orbitals, the network autonomously discovered **chemical hybridization** (mixing in $p_z$ polarization functions) to stretch the electron cloud along the internuclear axis and form a textbook covalent $\sigma$ bond. By comparing the $\alpha$ and $\beta$ spin channels, we observed that FermiKAN achieved this without resorting to **severe** Unrestricted Hartree-Fock (UHF) style symmetry breaking (spin contamination). This indicates that FermiKAN can act as an interpretable neuro-symbolic engine for scientific discovery.
+Through this, we discovered a stunning result: initialized with purely spherical $1s$ orbitals, the network autonomously discovered **chemical hybridization** (mixing in $p_z$ polarization functions) to stretch the electron cloud along the internuclear axis, aiming to form a covalent $\sigma$ bond.
+
+**The Bitter Lesson:** We verified that extreme compression (~696x in V2) allows the network to approach the true FCI energy limit (-1.1743 Hartree). However, our "Glass-Box" analysis caught the AI cheating! By comparing the $\alpha$ and $\beta$ spin channels, we found that V2 resorted to severe **Unrestricted Hartree-Fock (UHF) style symmetry breaking (spin contamination)**. Because V2 mathematically enforces a strict separation between radial and angular variables, the orbital becomes completely rigid; its only way to avoid catastrophic Coulomb repulsion was to break spatial symmetry entirely. 
+In contrast, our V1 architecture (with a more moderate ~330x compression) possesses the expressivity to autonomously learn chemical hybridization while preserving the **Restricted Hartree-Fock (RHF) spin symmetry**, as demonstrated in our interpretability reports. However, we must acknowledge that this is not a mathematical guarantee; without explicit constraints, the optimizer is highly susceptible to falling into the more easily stabilized UHF local minimum to artificially avoid Coulomb repulsion.
+**Conclusion:** While pushing architectural compression over 700x achieves mathematically impressive energies, highly compressed models (both V1 and V2) are vulnerable to unphysical symmetry breaking due to the difficulty of optimization. To reliably force the neural network to respect RHF constraints without relying on lucky initialization trajectories, explicit physical constraints must be applied or further architectural innovation is required.
 
 ---
 
@@ -63,15 +67,11 @@ Beyond optimization stability, PD-KAN introduces a crucial advantage for the era
 
 ## Known Issues & Next Steps ⚠️
 
-### 1. The Autonomous Hybridization Discovery
-While the 330x compression and high accuracy are fantastic, our "Glass-box" interpretability tool (`analyze_weights.py`) revealed something even more profoundly interesting. The network autonomously learned to mix $p_z$ components into the base $s$ orbitals to form a highly directional covalent bond, mimicking human-derived molecular orbital theory (hybridization). Furthermore, it managed to capture significant correlation energy (via the Jastrow factor) while largely preserving the spatial symmetry between the $\alpha$ and $\beta$ spin channels, avoiding severe UHF-style spin contamination.
-**Next Step:** We are developing automated post-processing pipelines to extract Natural Bond Orbitals (NBO) directly from the learned density matrices, allowing quantum chemists to directly interact with and interpret the AI's learned wavefunction.
+### 1. [RESOLVED] Initializing Larger Atoms (The Aufbau Challenge)
+Previously, the network initialized all electrons exclusively into the spherical $1s$ orbital state (with all $p$ and $d$ angular weights set exactly to zero) to prevent the initial energy from exploding. While this beautifully forced the AI to autonomously "invent" $p$ orbitals and discover the Pauli exclusion principle on the fly, stuffing 6 or 8 electrons into a $1s$ orbital caused catastrophic Pauli repulsion for larger atoms like Carbon or Oxygen.
+**Resolution:** We have successfully implemented a chemically-aware initialization strategy (`StochasticHomeAtomInitializer`) that safely pre-allocates electrons into their neutral atom ground-state shells (guided by atomic number $Z$). This stabilizes the initial optimization steps. *(Note: This creates a new optimization challenge: an "Activation Energy" plateau due to near-zero initial orbital overlap between isolated atoms, contributing to the ~10,000 iterations required for LiH convergence).*
 
-### 2. Initializing Larger Atoms (The Aufbau Challenge)
-Currently, the network initializes all electrons exclusively into the spherical $1s$ orbital state (with all $p$ and $d$ angular weights set exactly to zero) to prevent the initial energy from exploding. While this beautifully forces the AI to autonomously "invent" $p$ orbitals and discover the Pauli exclusion principle on the fly (a fascinating neuro-symbolic phenomenon), stuffing 6 or 8 electrons into a $1s$ orbital will cause catastrophic Pauli repulsion and gradient explosion for larger atoms like Carbon or Oxygen.
-**Next Step:** Implement a chemically-aware initialization strategy (guided by the Aufbau principle) that safely pre-allocates electrons into higher $s$ and $p$ shells for heavier elements. This will stabilize the initial optimization steps without losing the differentiable "Glass-Box" property.
-
-### 3. The Engineering Challenge (K-FAC)
+### 2. The Engineering Challenge (K-FAC)
 While the mathematical foundation of PD-KAN successfully narrow the loss landscape, scaling this architecture to massive systems (e.g., Benzene) exposes a critical engineering bottleneck.
 
 Currently, for small-scale PoCs (like H2 dissociation), the geometrically smoothed landscape allows the model to converge rapidly using only **first-order optimization (Adam)**. 
@@ -82,6 +82,10 @@ I am an R&D researcher at a chemical manufacturer and have pushed the math as fa
 **I am actively looking for:**
 1. **JAX/XLA wizards** to help revive K-FAC for this architecture.
 2. **Quantum Chemists & Physicists** to brainstorm and implement elegant physical constraints to identify and resolve any other unforeseen physical artifacts!
+
+### 3. Expressivity vs. Optimization Dilemma (UHF Symmetry Breaking in LiH)
+While the PD-KAN architecture remarkably reaches near-FCI energy for LiH (e.g., -8.055 Hartree vs. -8.070 Hartree, requiring ~10,000 iterations), "Glass-Box" weight extraction reveals that it achieves this by abandoning textbook covalent bonding. Given the freedom of an Unrestricted Hartree-Fock (UHF) regime, the network breaks spatial symmetry (e.g., $\alpha$ localizing on H, $\beta$ localizing on Li d-orbitals) to artificially avoid Coulomb repulsion (Left-Right correlation). Since the exact physical ground state for closed-shell LiH possesses Restricted Hartree-Fock (RHF) symmetry, this behavior poses a fundamental physical question: Is the optimizer trapped in a high-dimensional UHF local minimum, or does the current highly-compressed, single-determinant ansatz simply lack the expressivity to capture dynamic correlation without breaking symmetry?
+**Next Step:** Apply strict RHF constraints (forcing $\alpha$ and $\beta$ to share spatial orbitals) on LiH. If the energy drops, it is an optimization failure. If the energy increases, it proves a mathematical ceiling of the current expressivity, necessitating the integration of multiple determinants or dynamic LCAO coefficients.
 
 PRs, forks, and discussions are highly welcome!
 
