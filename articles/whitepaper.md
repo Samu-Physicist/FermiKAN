@@ -13,7 +13,7 @@ In this article, we introduce an architecture that solves the fundamental "Origi
 
 > 💻 **Code Availability**: The complete JAX implementation, including `environment.yml` and `Apptainer.def` for easy replication, is open-sourced on GitHub: **[Samu-Physicist/FermiKAN](https://github.com/Samu-Physicist/FermiKAN)**
 
-![Parameter Compression: 437k down to 1.3k](./compression_chart.png)
+<img src="./compression_chart.png" alt="Parameter Compression: 437k down to 1.3k" width="600" />
 
 How did we do it? Let’s dive into the geometry that made this possible.
 
@@ -137,11 +137,11 @@ What happened next was a serendipitous discovery.
 By forcing the network to learn within a physical S3 manifold rather than a massive unconstrained MLP, we drastically shrank the parameter space. The original FermiNet required 437,200 parameters for the H2 molecule. PD-KAN achieved the ground state using only 1,328 parameters—a 330-fold compression.
 
 **2. The Speed: 6x Faster Wall-Time**
-![6x Wall-Time Speedup](./walltime_chart.png)
+<img src="./walltime_chart.png" alt="6x Wall-Time Speedup" width="600" />
 Because the parameter count is minuscule and the tensor contractions (via `jnp.einsum`) are mathematically aligned with physical basis sets, the computational overhead is drastically reduced. On the same hardware setup (measured with a massive batch size of 16,384 walkers), the total wall-time for the optimization run dropped from 687.07 seconds to just 115.87 seconds (a ~6x speedup). 
 
 **3. The Bitter Lesson: Convergence and Accuracy**
-![Loss Convergence Curve Comparison](./learning_curve.png)
+<img src="./learning_curve.png" alt="Loss Convergence Curve Comparison" width="600" />
 
 However, we cannot escape "The Bitter Lesson" of AI. Because PD-KAN is an explicitly constructed "Glass Box," it lacks the massive, unconstrained representational capacity of the original MLP, ultimately falling short of FermiNet's raw energy accuracy by ~0.01 Hartree. Furthermore, in an apples-to-apples comparison using the standard Adam optimizer for both models, PD-KAN's highly constrained loss landscape required 4x more iterations to converge than the original FermiNet. While Adam provided a serendipitous first step for this PoC, scaling this architecture to massive molecules will require both further theoretical expansions and the revival of K-FAC for JAX to overcome these convergence hurdles.
 
