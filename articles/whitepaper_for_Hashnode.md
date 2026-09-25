@@ -9,7 +9,7 @@ In this project, we introduce Physics-Designed KAN (PD-KAN), a framework that pu
 
 - TPU-Friendly Vectorization: Replacing branching B-splines with orthogonal polynomials, fully vectorized via JAX's jnp.einsum and lax.scan to create pure dense GEMM operations.
 - 330x Parameter Compression: Integrating this JAX-native KAN into DeepMind's FermiNet, shrinking the architecture from 437,200 down to just 1,328 parameters for the H2 molecule (the "Hello World" of quantum chemistry).
-- Numerical Stability: Eliminating the notorious $r \to 0$ origin singularity using a 4D epsilon-manifold mapping, preventing NaN explosions during optimization.
+- Numerical Stability: Eliminating the notorious \\(r \to 0\\) origin singularity using a 4D epsilon-manifold mapping, preventing NaN explosions during optimization.
 - AI-Empowered Engineering: As a solo industrial chemist, translating complex LCAO physics into TPU-optimized JAX code was achieved through extensive pair-programming and brainstorming with **Gemini**. This project serves as a real-world showcase of how AI coding assistants can exponentially amplify domain experts to push the boundaries of ML systems, especially in AI for Science.
 
 > 💻 **Code Availability**: The complete JAX implementation, including `environment.yml` and `Apptainer.def` for easy replication, is open-sourced on GitHub: **[Samu-Physicist/FermiKAN](https://github.com/Samu-Physicist/FermiKAN)**
@@ -22,12 +22,12 @@ How did we do it? To understand *why* we needed JAX's powerful vectorization to 
 
 ## 1. Introduction: The Origin Singularity in Continuous 3D Spaces
 
-In the rapidly evolving landscape of 3D deep learning, extracting features from continuous fields—like electron wavefunctions or fluid dynamics—often leads to a fatal numerical trap: **the Origin Singularity**. When a particle approaches a central node (e.g., $r \to 0$), distance-based features like $1/r$ or normalized vectors $\vec{r}/|\vec{r}|$ blow up, unleashing infinite gradients (NaNs) that instantly destroy the optimizer. Frameworks like `e3nn` solve this for discrete nodes, but in continuous space, this singularity is a persistent nightmare.
+In the rapidly evolving landscape of 3D deep learning, extracting features from continuous fields—like electron wavefunctions or fluid dynamics—often leads to a fatal numerical trap: **the Origin Singularity**. When a particle approaches a central node (e.g., \\(r \to 0\\)), distance-based features like \\(1/r\\) or normalized vectors \\(\vec{r}/|\vec{r}|\\) blow up, unleashing infinite gradients (NaNs) that instantly destroy the optimizer. Frameworks like `e3nn` solve this for discrete nodes, but in continuous space, this singularity is a persistent nightmare.
 
-So, why not just feed raw Cartesian coordinates $(x, y, z)$ into a standard Multi-Layer Perceptron (MLP) or a Kolmogorov-Arnold Network (KAN)? 
+So, why not just feed raw Cartesian coordinates \\((x, y, z)\\) into a standard Multi-Layer Perceptron (MLP) or a Kolmogorov-Arnold Network (KAN)? 
 
 Here lies the fundamental trap: **The Origin Singularity** and **the Curse of Divergence**.
-If we try to extract angular dependencies directly from Cartesian inputs, we inevitably face a division-by-zero singularity at the origin ($r \to 0$). On the other extreme, standard polynomial representations (like solid harmonics) couple the radial distance with the angles. As the distance from the origin increases, these $x^l, y^l, z^l$ polynomials blow up to infinity, destroying the Lipschitz continuity of the network and causing massive gradient instability. 
+If we try to extract angular dependencies directly from Cartesian inputs, we inevitably face a division-by-zero singularity at the origin (\\(r \to 0\\)). On the other extreme, standard polynomial representations (like solid harmonics) couple the radial distance with the angles. As the distance from the origin increases, these \\(x^l, y^l, z^l\\) polynomials blow up to infinity, destroying the Lipschitz continuity of the network and causing massive gradient instability. 
 
 We need a canvas that is smooth, free of singularities, and decouples the radial and angular components.
 
@@ -39,13 +39,13 @@ How do we eliminate a 3D singularity? By stepping into a higher dimension.
 
 Instead of dealing with the precarious 3D Cartesian space, we project our 3D directional vectors into a bounded 4D manifold using an **epsilon-regularization map**. In the realm of continuous neural fields, we can use this geometric elegance to bypass the origin singularity.
 
-Let our spatial coordinate be defined by its radial distance $r$ and a 4D unit vector 
+Let our spatial coordinate be defined by its radial distance \\(r\\) and a 4D unit vector 
 
-$q = \frac{1}{\sqrt{r^2+\epsilon^2}}(x,y,z,\epsilon)$.
+\\(q = \frac{1}{\sqrt{r^2+\epsilon^2}}(x,y,z,\epsilon)\\).
 
 The magic happens here: because the vector is strictly bound to a unit manifold, any polynomial learned by the network on this manifold is inherently bounded. It **never diverges**, no matter how far the particle is from the origin. 
 
-Furthermore, mapping polynomials on this manifold naturally projects down to hybridizations of Solid Spherical Harmonics in 3D space. We have successfully decoupled the radial component $r$ from the pure, singularity-free angular canvas.
+Furthermore, mapping polynomials on this manifold naturally projects down to hybridizations of Solid Spherical Harmonics in 3D space. We have successfully decoupled the radial component \\(r\\) from the pure, singularity-free angular canvas.
 
 Now, we have the stable environment. The next question is: How do we construct a neural network that can natively and efficiently learn these hybridized angular bases? Enter the orthogonal-polynomial Kolmogorov-Arnold Network (KAN).
 
@@ -82,8 +82,8 @@ In the realm of quantum chemistry, this is known as Linear Combination of Atomic
 
 Our core contribution to this ecosystem is the **Physics-Designed KAN (PD-KAN)**.
 Typically, Neural QMC models require extensive pre-training to learn the fundamental shapes of atomic orbitals before the actual optimization can begin. PD-KAN eliminates this by adopting a strategic **Hybrid Initialization Paradigm**:
-1. **Physics-Informed Parametric Residuals (Radial):** To strictly preserve the electron-nucleus cusp condition and numerical stability, the radial component is initialized with exact analytical solutions (Laguerre polynomials). The KAN is tasked with learning only the *parameter residual*—the dynamic shift in the effective nuclear charge $\Delta \xi(r, h)$ caused by electron screening.
-2. **Unconstrained Hybridization (Angular):** While the radial component uses physical priors, the angular component starts from a neutral state ($W=0$). We do *not* hardcode spherical harmonics. Instead, the network is given raw Cartesian monomials and must learn to assemble the optimal polarized orbitals (e.g., $p_z$) and chemical hybridization purely through gradient descent.
+1. **Physics-Informed Parametric Residuals (Radial):** To strictly preserve the electron-nucleus cusp condition and numerical stability, the radial component is initialized with exact analytical solutions (Laguerre polynomials). The KAN is tasked with learning only the *parameter residual*—the dynamic shift in the effective nuclear charge \\(\Delta \xi(r, h)\\) caused by electron screening.
+2. **Unconstrained Hybridization (Angular):** While the radial component uses physical priors, the angular component starts from a neutral state (\\(W=0\\)). We do *not* hardcode spherical harmonics. Instead, the network is given raw Cartesian monomials and must learn to assemble the optimal polarized orbitals (e.g., \\(p_z\\)) and chemical hybridization purely through gradient descent.
 
 By plugging PD-KAN into the FermiNet infrastructure, we achieve a zero-shot initialization paradigm. The network starts with a physically safe state at Step 0, bypassing the heavy pre-training phase entirely while retaining the architectural flexibility to learn optimal spatial symmetries dynamically.
 
@@ -91,7 +91,7 @@ By plugging PD-KAN into the FermiNet infrastructure, we achieve a zero-shot init
 To visualize how these hybrid mechanics operate in practice, here is the step-by-step data flow of the architecture:
 
 1. **Dynamic Coordinate Shift (Vector Backflow)**
-   - Raw electron/nuclei coordinates are fed into a Backflow-KAN to learn electron correlations, generating a dynamic shift $\eta_i$.
+   - Raw electron/nuclei coordinates are fed into a Backflow-KAN to learn electron correlations, generating a dynamic shift \\(\eta_i\\).
    - These effective coordinates are mapped to the 4D Epsilon-Manifold to prevent origin singularities.
    ```mermaid
    graph LR
@@ -101,7 +101,7 @@ To visualize how these hybrid mechanics operate in practice, here is the step-by
        style C fill:#f9f2f4,stroke:#333
    ```
 2. **Physical Basis Evaluation (PD-KAN)**
-   - **Radial**: The scalar distance feeds into a Chebyshev KAN (handling static morphing and dynamic breathing), which outputs a dynamic parameter $\xi$. This parameter controls the exponential decay of Analytical Laguerre Polynomials, ensuring an exact electron-nucleus cusp.
+   - **Radial**: The scalar distance feeds into a Chebyshev KAN (handling static morphing and dynamic breathing), which outputs a dynamic parameter \\(\xi\\). This parameter controls the exponential decay of Analytical Laguerre Polynomials, ensuring an exact electron-nucleus cusp.
    - **Angular**: The 4D embedding feeds into an Angular KAN, assembling Cartesian monomials with learnable weights (*Unbiased Initialization*).
    ```mermaid
    graph LR
@@ -167,7 +167,7 @@ If you are passionate about crossing disciplinary boundaries to push the limits 
 You may think, "this is just a quantum chemistry solver disguised as a neural network, isn't it?" And you would be right. But the true potential of PD-KAN extends far beyond merely speeding up calculations or smoothing the loss landscape. Its advantage lies in its **mechanistic interpretability**.
 Standard neural networks like MLPs are black boxes; they output an energy value, but it is nearly impossible to extract physical meaning from their internal weights. This creates a severe bottleneck when trying to use Large Language Models (LLMs) to accelerate scientific discovery. If an LLM proposes a novel molecular structure, a standard MLP can only tell it whether a physical property (like energy) is high or low, but it cannot explain *why*.
 
-FermiKAN (PD-KAN) could offer a path forward. Because it is built on Kolmogorov-Arnold Networks and initialized with physical basis sets, the converged parameters (such as the orbital hybridization parameter $\xi$ or polynomial coefficients) are designed to carry explicit physical meaning, such as the effective nuclear charge. 
+FermiKAN (PD-KAN) could offer a path forward. Because it is built on Kolmogorov-Arnold Networks and initialized with physical basis sets, the converged parameters (such as the orbital hybridization parameter \\(\xi\\) or polynomial coefficients) are designed to carry explicit physical meaning, such as the effective nuclear charge. 
 In the future, FermiKAN might serve not just as a verifier, but as an **interpretable physics engine**. When an LLM generates a scientific hypothesis, FermiKAN could potentially verify it and directly feed back the symbolic, physically meaningful parameters as text or mathematical expressions. This would create a powerful **Neuro-Symbolic feedback loop**—combining the vast intuitive generation of LLMs with the rigorous, interpretable verification of theoretical physics. This, I believe, represents one of the most promising futures for AI for Science.
 
 *(For readers interested in a demonstration of how we opened this "Glass Box" to mathematically trace how the network converges to the Restricted Hartree-Fock (RHF) spatial symmetry from its unbiased angular weights, please refer to the detailed [Interpretability Demo (RHF Symmetry Emergence)](https://github.com/Samu-Physicist/FermiKAN/blob/main/H2_interpretability_demo.ipynb) in the project repository.)*
@@ -178,9 +178,9 @@ In the future, FermiKAN might serve not just as a verifier, but as an **interpre
 
 Today, the AI industry is heavily focused on "Coding Agents"—tools designed to instantly generate boilerplate code for rapid software development. While powerful, this "coding supremacy" narrative misses the mark for AI for Science. When tackling unsolved physical bottlenecks or navigating the deep complexities of JAX compiler optimization, we do not need a fast autocomplete. We need a *Thought Partner*—an AI capable of deep reasoning, vast scientific context, and protracted brainstorming.
 
-This project was not "generated" by an agent. I am just an ordinary R&D researcher at a chemical manufacturer—a human baseline, not a giant. Let's call my domain expertise a base of $1.1$. However, by pairing my theoretical knowledge (the $1.1$) with the deep reasoning capabilities of Gemini, and by building upon the monumental foundation of DeepMind's FermiNet, we collaboratively pioneered a new architectural paradigm: learnable physical basis sets (PD-KAN).
+This project was not "generated" by an agent. I am just an ordinary R&D researcher at a chemical manufacturer—a human baseline, not a giant. Let's call my domain expertise a base of \\(1.1\\). However, by pairing my theoretical knowledge (the \\(1.1\\)) with the deep reasoning capabilities of Gemini, and by building upon the monumental foundation of DeepMind's FermiNet, we collaboratively pioneered a new architectural paradigm: learnable physical basis sets (PD-KAN).
 
-If we rely solely on AI to generate everything without understanding the underlying mechanics, our human baseline drops to $0.9$. Applying the immense exponent of AI to a base of $0.9$ will only drive our collective capability down to zero. But as long as we maintain our deep domain expertise (a base of $> 1.0$) and use AI as a reasoning partner rather than a replacement, AI acts as an infinite exponent that drives human potential towards infinity.
+If we rely solely on AI to generate everything without understanding the underlying mechanics, our human baseline drops to \\(0.9\\). Applying the immense exponent of AI to a base of \\(0.9\\) will only drive our collective capability down to zero. But as long as we maintain our deep domain expertise (a base of \\(> 1.0\\)) and use AI as a reasoning partner rather than a replacement, AI acts as an infinite exponent that drives human potential towards infinity.
 
 *I believe that AI is an exponent standing on the shoulders of humans.*
 

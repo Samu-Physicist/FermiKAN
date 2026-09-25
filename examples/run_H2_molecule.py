@@ -32,7 +32,7 @@ def main(argv):
     import jax.numpy as jnp
     
     def pdkan_builder(nspins, charges, **kwargs):
-        from ferminet_adapter import make_pdkan_network
+        from fermikan.adapters.ferminet_adapter import make_pdkan_network
         atoms = jnp.stack([jnp.array(atom.coords) for atom in config.system.molecule])
         charges_tuple = tuple([int(atom.charge) for atom in config.system.molecule])
         network_pdkan, options = make_pdkan_network(atoms, nspins, charges_tuple, num_determinants=1)

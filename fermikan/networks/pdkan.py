@@ -2,116 +2,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def get_slater_alpha(Z: int, n: int) -> float:
-    if Z < 1 or Z > 10:
-        raise ValueError(f"SlaterInitializer currently supports Z=1 to 10. Got Z={Z}")
-    if n == 1:
-        S = 0.0 if Z == 1 else 0.30
-        return (Z - S) / 1.0
-    elif n == 2:
-        if Z < 3:
-            S = 0.85 * (Z - 1)
-            return max(Z - S, 0.1) / 2.0
-        S = 1.70 + 0.35 * (Z - 3)
-        return (Z - S) / 2.0
-    else:
-        return 0.1
-
-class StochasticHomeAtomInitializer(hk.initializers.Initializer):
-    def __init__(self, Z_atoms: tuple[int, ...], num_determinants: int, n_up: int, n_down: int, stddev: float = 1.0, noise: float = 1e-4):
-        self.Z_atoms = Z_atoms
-        self.num_determinants = num_determinants
-        self.n_up = n_up
-        self.n_down = n_down
-        self.stddev = stddev
-        self.noise = noise
-
-    def __call__(self, shape, dtype=jnp.float32):
-        # shape is (N_atoms, N_total_orbitals, N_MOs)
-        N_atoms = len(self.Z_atoms)
-        N_MOs = shape[2]
-        
-        # 1. Generate all available orbitals from neutral atoms
-        all_orbitals = []
-        for a, Z in enumerate(self.Z_atoms):
-            for e in range(Z):
-                shell = (e // 2) * 4  # 0(1s), 4(2s), 8(3s)...
-                all_orbitals.append((a, shell))
-                
-        # 2. Sort by shell energy so we populate 1s across all atoms first, then 2s, etc.
-        all_orbitals.sort(key=lambda x: x[1])
-        
-        if N_MOs == self.n_up + self.n_down:
-            # UHF Mode: Spin-dependent assignment for True Neutral Atoms
-            total_e = self.n_up + self.n_down
-            if len(all_orbitals) > total_e:
-                all_orbitals = all_orbitals[:total_e] # Cation
-            elif len(all_orbitals) < total_e:
-                all_orbitals += [all_orbitals[-1]] * (total_e - len(all_orbitals)) # Anion
-                
-            atoms_alpha, shells_alpha = [], []
-            atoms_beta, shells_beta = [], []
-            
-            # Count occurrences to find cores (pairs) and open shells
-            counts = {}
-            for orb in all_orbitals:
-                counts[orb] = counts.get(orb, 0) + 1
-                
-            open_shells = []
-            for orb, count in counts.items():
-                if count >= 2:
-                    # Distribute a pair
-                    atoms_alpha.append(orb[0]); shells_alpha.append(orb[1])
-                    atoms_beta.append(orb[0]); shells_beta.append(orb[1])
-                    if count > 2:
-                        open_shells.extend([orb] * (count - 2))
-                elif count == 1:
-                    open_shells.append(orb)
-                    
-            # Distribute open shells to satisfy n_up and n_down
-            for orb in open_shells:
-                if len(atoms_alpha) < self.n_up:
-                    atoms_alpha.append(orb[0]); shells_alpha.append(orb[1])
-                elif len(atoms_beta) < self.n_down:
-                    atoms_beta.append(orb[0]); shells_beta.append(orb[1])
-                    
-            home_atoms_flat = jnp.array((atoms_alpha + atoms_beta) * self.num_determinants)
-            home_shells_flat = jnp.array((shells_alpha + shells_beta) * self.num_determinants)
-            
-        else:
-            # RHF Mode: We just take the first N_MOs unique spatial orbitals
-            unique_orbs = []
-            for orb in all_orbitals:
-                if orb not in unique_orbs:
-                    unique_orbs.append(orb)
-            while len(unique_orbs) < N_MOs:
-                unique_orbs.append(unique_orbs[-1])
-            
-            atoms_rhf = [orb[0] for orb in unique_orbs[:N_MOs]]
-            shells_rhf = [orb[1] for orb in unique_orbs[:N_MOs]]
-            home_atoms_flat = jnp.array(atoms_rhf * self.num_determinants)
-            home_shells_flat = jnp.array(shells_rhf * self.num_determinants)
-        
-        # Truncate to match N_MOs (shape[2]) to prevent Python broadcasting crashes!
-        home_atoms_flat = home_atoms_flat[:shape[2]]
-        home_shells_flat = home_shells_flat[:shape[2]]
-        
-        # Atom mask: 1.0 if it's the home atom, else self.noise
-        mask_atom = jnp.where(jnp.arange(N_atoms)[:, None] == home_atoms_flat[None, :], 1.0, self.noise)
-        
-        # Orb mask: 1.0 if it's the target shell, else self.noise
-        N_total_orbitals = shape[1]
-        mask_orb = jnp.where(jnp.arange(N_total_orbitals)[:, None] == home_shells_flat[None, :], 1.0, self.noise)
-        
-        # Combine masks: (N_atoms, N_total_orbitals, N_MOs)
-        mask = mask_atom[:, None, :] * mask_orb[None, :, :]
-        
-        key = hk.next_rng_key()
-        # Initialize near 1.0 for the targeted 1s home atom, and near 0.0 for others
-        base_vals = jnp.where(mask > 0.5, 1.0, 0.0) 
-        random_noise = jax.random.normal(key, shape, dtype) * self.noise
-        
-        return base_vals + random_noise
+from fermikan.utils.initializers import get_slater_alpha, StochasticHomeAtomInitializer
 
 def get_monomials(q: jnp.ndarray, max_l: int) -> dict[int, jnp.ndarray]:
     x, y, z = q[..., 0], q[..., 1], q[..., 2]
@@ -124,7 +15,20 @@ def get_monomials(q: jnp.ndarray, max_l: int) -> dict[int, jnp.ndarray]:
         res[3] = jnp.stack([x**3, y**3, z**3, x**2*y, x**2*z, y**2*x, y**2*z, z**2*x, z**2*y, x*y*z], axis=-1)
     return res
 
-class Vectorized_RadialKAN(hk.Module):
+class VectorizedRadialKan(hk.Module):
+    """Computes the radial part of the molecular orbitals using KANs.
+
+    This module handles the exact generalized Laguerre polynomials 
+    combined with a dynamic, learnable envelope that enforces 
+    the Kato cusp condition at the nuclei.
+
+    Args:
+        degree: Degree of the Chebyshev polynomials for static morphing.
+        Z_atoms: Tuple of nuclear charges for each atom.
+        n_values: List of principal quantum numbers (n) for each shell.
+        l_values: List of azimuthal quantum numbers (l) for each shell.
+        name: Optional name for the Haiku module.
+    """
     def __init__(self, degree: int, Z_atoms: tuple[int, ...], n_values: list[int], l_values: list[int], name: str | None = None):
         super().__init__(name=name)
         self.degree = degree
@@ -133,26 +37,26 @@ class Vectorized_RadialKAN(hk.Module):
         self.l_values = l_values
 
     def __call__(self, r_shifted: jnp.ndarray, r_true: jnp.ndarray, h_dynamic: jnp.ndarray = None) -> jnp.ndarray:
-        N_atoms = len(self.Z_atoms)
+        num_atoms = len(self.Z_atoms)
         N_shells = len(self.n_values)
         
         # Init xi exactly from Slater's rules
-        init_xi = jnp.zeros((N_atoms, N_shells))
+        init_xi = jnp.zeros((num_atoms, N_shells))
         for a, Z in enumerate(self.Z_atoms):
             for s, n in enumerate(self.n_values):
                 init_xi = init_xi.at[a, s].set(get_slater_alpha(Z, n))
                 
         raw_xi_init = jnp.log(jnp.exp(init_xi) - 1.0)
-        raw_xi = hk.get_parameter("raw_xi", shape=(N_atoms, N_shells), init=hk.initializers.Constant(raw_xi_init))
+        raw_xi = hk.get_parameter("raw_xi", shape=(num_atoms, N_shells), init=hk.initializers.Constant(raw_xi_init))
         
         # Static Orbital Morphing (r_true)
         # Chebyshev up to degree 10 on r_true
-        r_true_exp = jnp.expand_dims(r_true, -1) # (..., N_atoms, 1)
+        r_true_exp = jnp.expand_dims(r_true, -1) # (..., num_atoms, 1)
         x_cheb_static = jnp.tanh(r_true_exp**2) * 2.0 - 1.0
         T_static = [jnp.ones_like(x_cheb_static), x_cheb_static]
         for k in range(2, 10):
             T_static.append(2.0 * x_cheb_static * T_static[-1] - T_static[-2])
-        kan_features_static = jnp.concatenate(T_static, axis=-1) # (..., N_atoms, 10)
+        kan_features_static = jnp.concatenate(T_static, axis=-1) # (..., num_atoms, 10)
         
         delta_xi_static = hk.Linear(N_shells, with_bias=False, w_init=hk.initializers.Constant(0.0), name="kan_xi_static")(kan_features_static)
         
@@ -160,9 +64,9 @@ class Vectorized_RadialKAN(hk.Module):
         if h_dynamic is not None:
             # h_dynamic is (..., N_e, 16). We sum over N_e to get global environment (..., 16)
             h_env = jnp.sum(h_dynamic, axis=-2) # (..., 16)
-            # We want to map this to (N_atoms, N_shells)
-            delta_xi_dynamic_flat = hk.Linear(N_atoms * N_shells, with_bias=False, w_init=hk.initializers.Constant(0.0), name="kan_xi_dynamic")(h_env)
-            delta_xi_dynamic = jnp.reshape(delta_xi_dynamic_flat, h_env.shape[:-1] + (N_atoms, N_shells))
+            # We want to map this to (num_atoms, N_shells)
+            delta_xi_dynamic_flat = hk.Linear(num_atoms * N_shells, with_bias=False, w_init=hk.initializers.Constant(0.0), name="kan_xi_dynamic")(h_env)
+            delta_xi_dynamic = jnp.reshape(delta_xi_dynamic_flat, h_env.shape[:-1] + (num_atoms, N_shells))
         else:
             delta_xi_dynamic = 0.0
             
@@ -171,7 +75,7 @@ class Vectorized_RadialKAN(hk.Module):
         
 
         # Calculate Exact LCAO Baseline (Generalized Laguerre Polynomials)
-        R_laguerre_list = []
+        r_laguerre_list = []
         for a, Z in enumerate(self.Z_atoms):
             shell_vals = []
             for s, (n, l) in enumerate(zip(self.n_values, self.l_values)):
@@ -191,51 +95,62 @@ class Vectorized_RadialKAN(hk.Module):
                 else:
                     val = jnp.ones_like(x_lag)
                 shell_vals.append(val)
-            R_laguerre_list.append(jnp.stack(shell_vals, axis=-1))
+            r_laguerre_list.append(jnp.stack(shell_vals, axis=-1))
             
-        R_laguerre = jnp.stack(R_laguerre_list, axis=-2) # (..., N_atoms, N_shells)
+        r_laguerre = jnp.stack(r_laguerre_list, axis=-2) # (..., num_atoms, N_shells)
         
 
         # --- Exact e-n Cusp Protector ---
         # Z_I is the true nuclear charge
-        Z_I = jnp.array(self.Z_atoms) # (N_atoms,)
+        Z_I = jnp.array(self.Z_atoms) # (num_atoms,)
         
         # Transition parameter beta (learnable)
-        raw_beta = hk.get_parameter("raw_beta", shape=(N_atoms,), init=hk.initializers.Constant(0.0))
+        raw_beta = hk.get_parameter("raw_beta", shape=(num_atoms,), init=hk.initializers.Constant(0.0))
         beta = jax.nn.softplus(raw_beta) + 0.1 # Strictly positive
 
         
         # We need to correctly broadcast xi, Z_I, beta against r_true
-        # r_true shape: (..., N_atoms)
-        r_true_exp = jnp.expand_dims(r_true, -1) # (..., N_atoms, 1)
-        Z_I_exp = jnp.expand_dims(Z_I, -1) # (N_atoms, 1)
-        beta_exp = jnp.expand_dims(beta, -1) # (N_atoms, 1)
+        # r_true shape: (..., num_atoms)
+        r_true_exp = jnp.expand_dims(r_true, -1) # (..., num_atoms, 1)
+        Z_I_exp = jnp.expand_dims(Z_I, -1) # (num_atoms, 1)
+        beta_exp = jnp.expand_dims(beta, -1) # (num_atoms, 1)
         n_expanded = jnp.array(self.n_values).reshape(1, -1) # (1, N_shells)
         
-        # [Elegant Hydrogenic Cusp Distribution]
+        # [Hydrogenic Cusp Enforcement Envelope]
         # The Laguerre polynomial L_{n-1}^{(1)}(2 Z_I r / n) naturally provides a slope of -Z_I * (n-1)/n.
         # To make the TOTAL slope exactly -Z_I for EVERY shell, the Envelope MUST provide exactly -Z_I / n.
         Z_I_target = Z_I_exp / n_expanded
         
         envelope_arg = -xi * r_true_exp - (Z_I_target - xi) / beta_exp * (1 - jnp.exp(-beta_exp * r_true_exp))
-        envelope = jnp.exp(envelope_arg) # (..., N_atoms, N_shells)
+        envelope = jnp.exp(envelope_arg) # (..., num_atoms, N_shells)
         
         # Combine Laguerre basis with dynamic envelope
-        return R_laguerre * envelope
+        return r_laguerre * envelope
 
-class Vectorized_ShellAngularKAN(hk.Module):
-    def __init__(self, basis_pool: list[tuple[int, int]], N_MOs: int, init_epsilon: float = 1.0, name: str | None = None):
+class VectorizedShellAngularKan(hk.Module):
+    """Computes the angular part of the molecular orbitals using KANs.
+
+    Applies learnable polynomial weights to spatial monomials (s, p, d, f) 
+    to construct angular harmonics with atom-specific core polarizability.
+
+    Args:
+        basis_pool: List of tuples representing (n, l) quantum numbers.
+        num_mos: Number of molecular orbitals to generate.
+        init_epsilon: Initial value for the core polarizability radius.
+        name: Optional name for the Haiku module.
+    """
+    def __init__(self, basis_pool: list[tuple[int, int]], num_mos: int, init_epsilon: float = 1.0, name: str | None = None):
         super().__init__(name=name)
         self.basis_pool = basis_pool
-        self.N_MOs = N_MOs
+        self.num_mos = num_mos
         self.max_l = max([l for n, l in basis_pool])
         self.init_epsilon = init_epsilon
 
     def __call__(self, r_vec: jnp.ndarray) -> jnp.ndarray:
-        N_atoms = r_vec.shape[-2]
+        num_atoms = r_vec.shape[-2]
         
         # Atom-specific core polarizability radius (epsilon)
-        raw_epsilon = hk.get_parameter("raw_epsilon", shape=(N_atoms,), init=hk.initializers.Constant(jnp.log(jnp.exp(self.init_epsilon) - 1.0)))
+        raw_epsilon = hk.get_parameter("raw_epsilon", shape=(num_atoms,), init=hk.initializers.Constant(jnp.log(jnp.exp(self.init_epsilon) - 1.0)))
         epsilon = jax.nn.softplus(raw_epsilon)
         
         eps_expanded = jnp.broadcast_to(epsilon, r_vec.shape[:-1])
@@ -250,23 +165,23 @@ class Vectorized_ShellAngularKAN(hk.Module):
         
         shell_angular_vals = []
         for s, (n, l) in enumerate(self.basis_pool):
-            m_q = monos[l] # (..., N_atoms, N_mono)
+            m_q = monos[l] # (..., num_atoms, N_mono)
             N_mono = m_q.shape[-1]
             
-            # Learnable polynomial weights W: (N_atoms, N_MOs, N_mono)
+            # Learnable polynomial weights W: (num_atoms, num_mos, N_mono)
             if l == 0:
                 init_val = hk.initializers.Constant(1.0)
             else:
                 init_val = hk.initializers.Constant(0.0)
                 
-            W = hk.get_parameter(f"W_shell_{s}_n{n}_l{l}", shape=(N_atoms, self.N_MOs, N_mono), init=init_val)
+            W = hk.get_parameter(f"W_shell_{s}_n{n}_l{l}", shape=(num_atoms, self.num_mos, N_mono), init=init_val)
             
-            # m_q is (..., N_atoms, N_mono), W is (N_atoms, N_MOs, N_mono)
-            # Contract over N_mono to get (..., N_atoms, N_MOs)
+            # m_q is (..., num_atoms, N_mono), W is (num_atoms, num_mos, N_mono)
+            # Contract over N_mono to get (..., num_atoms, num_mos)
             val = jnp.einsum('...am, aom -> ...ao', m_q, W)
             shell_angular_vals.append(val)
             
-        # Stack over shells: (..., N_atoms, N_shells, N_MOs)
+        # Stack over shells: (..., num_atoms, N_shells, num_mos)
         A_vals = jnp.stack(shell_angular_vals, axis=-2)
         return A_vals
 
@@ -282,10 +197,10 @@ class FermiKAN_Orbitals(hk.Module):
         
         self.n_values = [n for n, l in orbitals_config]
         self.l_values = [l for n, l in orbitals_config]
-        self.N_MOs = self.num_determinants * self.num_electrons
+        self.num_mos = self.num_determinants * self.num_electrons
 
     def __call__(self, r_vecs_true: jnp.ndarray, eta: jnp.ndarray, h_dynamic: jnp.ndarray) -> jnp.ndarray:
-        N_atoms = r_vecs_true.shape[-2]
+        num_atoms = r_vecs_true.shape[-2]
         
         eta_expanded = jnp.expand_dims(eta, axis=-2) # (..., N_e, 1, 3)
         
@@ -293,32 +208,32 @@ class FermiKAN_Orbitals(hk.Module):
         r_shifted_rad = jnp.linalg.norm(r_vecs_shifted_rad, axis=-1)
         r_true = jnp.linalg.norm(r_vecs_true, axis=-1)
         
-        # 1. Vectorized Radial KAN -> Shape: (..., N_atoms, N_shells)
-        radial_fn = Vectorized_RadialKAN(degree=10, Z_atoms=self.Z_atoms, n_values=self.n_values, l_values=self.l_values, name="vec_radial")
+        # 1. Vectorized Radial KAN -> Shape: (..., num_atoms, N_shells)
+        radial_fn = VectorizedRadialKan(degree=10, Z_atoms=self.Z_atoms, n_values=self.n_values, l_values=self.l_values, name="vec_radial")
         R_val = radial_fn(r_shifted_rad, r_true, h_dynamic)
         
-        # 2. Vectorized Shell Angular KAN -> Shape: (..., N_atoms, N_shells, N_MOs)
-        angular_fn = Vectorized_ShellAngularKAN(basis_pool=self.orbitals_config, N_MOs=self.N_MOs, name="vec_angular")
+        # 2. Vectorized Shell Angular KAN -> Shape: (..., num_atoms, N_shells, num_mos)
+        angular_fn = VectorizedShellAngularKan(basis_pool=self.orbitals_config, num_mos=self.num_mos, name="vec_angular")
         A_val = angular_fn(r_vecs_shifted_rad)
         
         # 3. Combine Radial and Angular with r^l scaling
         r_true_L_list = [r_true**l for n, l in self.orbitals_config]
-        r_true_L = jnp.stack(r_true_L_list, axis=-1) # (..., N_atoms, N_shells)
+        r_true_L = jnp.stack(r_true_L_list, axis=-1) # (..., num_atoms, N_shells)
         
-        R_scaled = R_val * r_true_L # (..., N_atoms, N_shells)
-        R_expanded = jnp.expand_dims(R_scaled, -1) # (..., N_atoms, N_shells, 1)
+        R_scaled = R_val * r_true_L # (..., num_atoms, N_shells)
+        R_expanded = jnp.expand_dims(R_scaled, -1) # (..., num_atoms, N_shells, 1)
         
-        phi_basis = R_expanded * A_val # (..., N_atoms, N_shells, N_MOs)
+        phi_basis = R_expanded * A_val # (..., num_atoms, N_shells, num_mos)
         
         # 4. Multi-Orbital LCAO Mixing (C_{k, I, s})
         initializer = StochasticHomeAtomInitializer(self.Z_atoms, self.num_determinants, self.n_up, self.n_down, stddev=1.0, noise=1e-4)
         C = hk.get_parameter("LCAO_coeffs", 
-                             shape=(N_atoms, len(self.orbitals_config), self.N_MOs), 
+                             shape=(num_atoms, len(self.orbitals_config), self.num_mos), 
                              init=initializer)
         
-        phi_weighted = phi_basis * C # (..., N_atoms, N_shells, N_MOs)
+        phi_weighted = phi_basis * C # (..., num_atoms, N_shells, num_mos)
         
-        # Sum over atoms and shells -> (..., N_e, N_MOs)
+        # Sum over atoms and shells -> (..., N_e, num_mos)
         phi_molecular = jnp.sum(phi_weighted, axis=(-3, -2))
         
         # Reshape to (..., N_determinants, N_e, N_e)
@@ -428,7 +343,22 @@ class PDKAN_Jastrow(hk.Module):
         
         return J_val
 
-class FermiKAN_Network(hk.Module):
+class FermiKanNetwork(hk.Module):
+    """Physics-Designed Kolmogorov-Arnold Network (PD-KAN) for neural QMC.
+
+    This network replaces MLPs in FermiNet with an architecture
+    constrained by quantum mechanical principles (LCAO, Kato's cusp, 
+    and Slater screening). It can reduce parameter counts while 
+    maintaining accuracy.
+
+    Args:
+        Z_atoms: Tuple of nuclear charges for the system.
+        num_electrons: Total number of electrons in the system.
+        num_determinants: Number of Slater determinants to use.
+        n_up: Number of spin-up electrons.
+        n_down: Number of spin-down electrons.
+        name: Optional name for the Haiku module.
+    """
     def __init__(self, Z_atoms: tuple[int, ...], num_electrons: int, num_determinants: int = 1, n_up: int = None, n_down: int = None, name: str | None = None):
         super().__init__(name=name)
         self.num_electrons = num_electrons

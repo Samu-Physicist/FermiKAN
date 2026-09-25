@@ -17,6 +17,9 @@ micromamba activate fermikan
 
 # Patch kfac_jax for the latest JAX compatibility (replaces deprecated jax.P)
 sed -i 's/jax.P/jax.sharding.PartitionSpec/g' $(python -c "import site; print(site.getsitepackages()[0])")/kfac_jax/_src/utils/parallel.py
+
+# Install the FermiKAN package in editable mode
+pip install -e .
 ```
 
 ## 2. HPC Environment Setup (Apptainer / Singularity)
@@ -35,7 +38,7 @@ Once built, you do not need to install anything on the host machine. You can exe
 
 ```bash
 # Example execution using the container
-apptainer exec --nv fermikan.sif python3 run_pdkan_ferminet.py
+apptainer exec --nv --env PYTHONPATH=$PWD fermikan.sif python3 examples/run_H2_molecule.py
 ```
 
 
@@ -45,10 +48,10 @@ To execute the main proof-of-concept on the H2 molecule, simply run the wrapper 
 This script monkey-patches the original FermiNet architecture with our PD-KAN implementation and executes a zero-shot, Adam-optimized VMC run for 10,000 steps.
 
 ```bash
-python3 run_pdkan_ferminet.py
+python3 examples/run_H2_molecule.py
 ```
 
-*Note: The script is configured to save checkpoints every 2.0 minutes in the `exp_fermiKAN_H2/` directory. The entire run takes approximately 5-6 minutes on a modern GPU.*
+*Note: The script is configured to save checkpoints in the `archive/` directory.*
 
 ## 4. Extracting and Analyzing the Weights (Glass-Box XAI)
 
